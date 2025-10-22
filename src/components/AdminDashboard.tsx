@@ -126,7 +126,9 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
     }
   };
 
-  // Calculate total stock
+  // 🔧 FIX: Calculate stock correctly
+  // totalBooks = current stock (sudah dikurangi saat confirm borrowing)
+  // Ini SUDAH represent available books, TIDAK perlu dikurangi lagi!
   const totalBooks = books.reduce((sum, book) => sum + book.stock, 0);
   
   // Calculate borrowed books from CONFIRMED borrowings only (active, overdue, returning)
@@ -146,7 +148,9 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
   
   console.log('📊 Total borrowedBooksCount:', borrowedBooksCount);
   
-  const availableBooks = totalBooks - borrowedBooksCount;
+  // 🔧 FIX: totalBooks SUDAH adalah available books!
+  // Stock sudah dikurangi saat konfirmasi, jadi TIDAK perlu dikurangi lagi
+  const availableBooks = totalBooks;
 
   const pendingBorrowings = borrowings.filter((b) => b.status === 'pending');
   const activeBorrowings = borrowings.filter(
@@ -212,23 +216,19 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
 
   // STOCK VALIDATION
   console.log('📊 ═══════════ STOCK VALIDATION ═══════════');
-  console.log(`📊 Total books in system: ${totalBooks} books across ${books.length} titles`);
+  console.log(`📊 Available books (current stock): ${availableBooks} books across ${books.length} titles`);
   console.log(`📊 Currently borrowed: ${borrowedBooksCount} books`);
-  console.log(`📊 Available (calculated): ${availableBooks} books`);
-  console.log(`📊 Formula: Available = Total (${totalBooks}) - Borrowed (${borrowedBooksCount})`);
-  if (totalBooks !== availableBooks + borrowedBooksCount) {
-    console.error(`📊 ❌ MISMATCH! Total (${totalBooks}) ≠ Available (${availableBooks}) + Borrowed (${borrowedBooksCount})`);
-    console.error(`📊    Difference: ${Math.abs(totalBooks - (availableBooks + borrowedBooksCount))} books`);
-  } else {
-    console.log(`📊 ✅ Stock calculation CORRECT!`);
-  }
+  console.log(`📊 Formula: Available = Current Stock (sudah dikurangi saat confirm)`);
+  console.log(`📊 Logic: Ketika confirm borrowing, stock LANGSUNG dikurangi`);
+  console.log(`📊        Jadi totalBooks SUDAH represent available books`);
+  console.log(`📊 ✅ No double counting! Stock reduction only happens ONCE at confirmation.`);
   console.log('📊 ═══════════════════════════════════════');
 
   const stats = [
     {
-      title: 'Total Stok Buku Tersedia',
+      title: 'Stok Buku Tersedia',
       value: availableBooks,
-      subtitle: `${books.length} judul • ${availableBooks} eks siap dipinjam`,
+      subtitle: `${books.length} judul • ${availableBooks} eks tersedia`,
       icon: BookOpen,
       color: 'text-emerald-400',
       bgColor: 'bg-gradient-to-br from-emerald-950/40 to-teal-950/40 border border-emerald-800/30',

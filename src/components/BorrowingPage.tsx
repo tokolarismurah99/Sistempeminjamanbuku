@@ -13,10 +13,11 @@ import { id } from 'date-fns/locale';
 interface BorrowingPageProps {
   borrowings: Borrowing[];
   books: Book[];
-  onReturn: (borrowingId: string) => void;
+  onRequestReturn: (borrowingId: string) => void;
 }
 
-export function BorrowingPage({ borrowings, books, onReturn }: BorrowingPageProps) {
+export function BorrowingPage({ borrowings, books, onRequestReturn }: BorrowingPageProps) {
+  const [showBorrowBarcode, setShowBorrowBarcode] = useState(false);
   const [showReturnBarcode, setShowReturnBarcode] = useState(false);
   const [selectedBorrowing, setSelectedBorrowing] = useState<Borrowing | null>(null);
 
@@ -24,8 +25,8 @@ export function BorrowingPage({ borrowings, books, onReturn }: BorrowingPageProp
 
   const handleReturnClick = (borrowing: Borrowing) => {
     setSelectedBorrowing(borrowing);
-    onReturn(borrowing.id);
-    setShowReturnBarcode(true);
+    onRequestReturn(borrowing.id);
+    // Note: barcode dialog will be triggered from App.tsx via showBarcodeDialog state
   };
 
   const pendingBorrowings = borrowings.filter((b) => b.status === 'pending');
@@ -183,7 +184,7 @@ export function BorrowingPage({ borrowings, books, onReturn }: BorrowingPageProp
                 className="w-full border-emerald-700 text-emerald-400 hover:bg-emerald-950/30 hover:text-emerald-300"
                 onClick={() => {
                   setSelectedBorrowing(borrowing);
-                  setShowReturnBarcode(true);
+                  setShowBorrowBarcode(true);
                 }}
               >
                 <QrCode className="w-4 h-4 mr-2" />
@@ -300,14 +301,21 @@ export function BorrowingPage({ borrowings, books, onReturn }: BorrowingPageProp
         </TabsContent>
       </Tabs>
 
-      {/* Barcode Dialog */}
-      {selectedBorrowing && (
+      {/* Borrow Barcode Dialog (untuk status pending) */}
+      {selectedBorrowing && selectedBorrowing.status === 'pending' && (
         <BarcodeDisplay
-          barcode={
-            selectedBorrowing.status === 'returning'
-              ? selectedBorrowing.returnBarcode || ''
-              : selectedBorrowing.barcode || ''
-          }
+          barcode={selectedBorrowing.barcode || ''}
+          bookTitle={`${selectedBorrowing.details.length} Judul Buku`}
+          dueDate={selectedBorrowing.dueDate}
+          open={showBorrowBarcode}
+          onOpenChange={setShowBorrowBarcode}
+        />
+      )}
+
+      {/* Return Barcode Dialog (untuk status returning) */}
+      {selectedBorrowing && selectedBorrowing.status === 'returning' && (
+        <BarcodeDisplay
+          barcode={selectedBorrowing.returnBarcode || ''}
           bookTitle={`${selectedBorrowing.details.length} Judul Buku`}
           dueDate={selectedBorrowing.dueDate}
           open={showReturnBarcode}

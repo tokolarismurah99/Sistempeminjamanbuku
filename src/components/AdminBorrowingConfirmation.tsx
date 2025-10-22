@@ -36,6 +36,7 @@ export function AdminBorrowingConfirmation({
   const [scanInput, setScanInput] = useState('');
   const [selectedBorrowing, setSelectedBorrowing] = useState<Borrowing | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const pendingBorrowings = borrowings.filter((b) => b.status === 'pending');
 
@@ -57,11 +58,26 @@ export function AdminBorrowingConfirmation({
   };
 
   const handleConfirm = () => {
-    if (selectedBorrowing) {
-      onConfirmBorrowing(selectedBorrowing.id);
-      setShowConfirmDialog(false);
-      setSelectedBorrowing(null);
+    if (!selectedBorrowing || isConfirming) {
+      console.warn('⚠️ Button protection: Cannot confirm -', !selectedBorrowing ? 'no borrowing selected' : 'already confirming');
+      return;
     }
+    
+    console.log('🔘 Button: Starting confirmation process for', selectedBorrowing.id);
+    setIsConfirming(true);
+    
+    // Call parent handler
+    onConfirmBorrowing(selectedBorrowing.id);
+    
+    // Close dialog and clear selection immediately
+    setShowConfirmDialog(false);
+    setSelectedBorrowing(null);
+    
+    // Reset isConfirming after delay (safety buffer)
+    setTimeout(() => {
+      console.log('🔘 Button: Resetting isConfirming state');
+      setIsConfirming(false);
+    }, 3000); // Increased to 3 seconds for extra safety
   };
 
   const getBook = (bookId: string) => books.find((b) => b.id === bookId);
@@ -99,7 +115,7 @@ export function AdminBorrowingConfirmation({
               if (!book) return null;
 
               return (
-                <div key={detail.id} className="flex gap-3 p-3 bg-slate-800 rounded-lg border border-slate-700">
+                <div key={detail.bookId} className="flex gap-3 p-3 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="w-16 h-20 flex-shrink-0 rounded overflow-hidden bg-slate-700">
                     <ImageWithFallback
                       src={book.coverUrl}
@@ -244,7 +260,7 @@ export function AdminBorrowingConfirmation({
 
                     return (
                       <div
-                        key={detail.id}
+                        key={detail.bookId}
                         className={`flex gap-3 p-3 rounded-lg border ${
                           hasEnoughStock ? 'bg-slate-800 border-slate-700' : 'bg-red-950/30 border-red-800'
                         }`}
@@ -305,12 +321,12 @@ export function AdminBorrowingConfirmation({
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)} disabled={isConfirming}>
               Batal
             </Button>
-            <Button onClick={handleConfirm} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleConfirm} className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isConfirming}>
               <CheckCircle className="w-4 h-4 mr-2" />
-              Konfirmasi Peminjaman
+              {isConfirming ? 'Memproses...' : 'Konfirmasi Peminjaman'}
             </Button>
           </DialogFooter>
         </DialogContent>

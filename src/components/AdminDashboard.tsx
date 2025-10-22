@@ -72,7 +72,7 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
     
     if (status === 'borrowed') {
       filteredBorrowings = borrowings.filter(b => 
-        b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning'
+        b.status === 'active' || b.status === 'overdue' || b.status === 'returning'
       );
       title = 'Buku Dipinjam';
     } else if (status === 'active') {
@@ -80,7 +80,10 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
       title = 'Peminjaman Aktif';
     } else if (status === 'pending') {
       filteredBorrowings = pendingBorrowings;
-      title = 'Menunggu Konfirmasi';
+      title = 'Konfirmasi Peminjaman';
+    } else if (status === 'returning') {
+      filteredBorrowings = returningBorrowings;
+      title = 'Konfirmasi Pengembalian';
     } else if (status === 'overdue') {
       filteredBorrowings = overdueBorrowings;
       title = 'Peminjaman Terlambat';
@@ -126,12 +129,13 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
   // Calculate total stock
   const totalBooks = books.reduce((sum, book) => sum + book.stock, 0);
   
-  // Calculate borrowed books from active borrowings
+  // Calculate borrowed books from CONFIRMED borrowings only (active, overdue, returning)
+  // TIDAK termasuk 'pending' karena belum dikonfirmasi admin
   const filteredForBorrowed = borrowings.filter((b) => 
-    b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning'
+    b.status === 'active' || b.status === 'overdue' || b.status === 'returning'
   );
   
-  console.log('📊 Filtered borrowings for count:', filteredForBorrowed);
+  console.log('📊 Filtered borrowings for borrowed count (active/overdue/returning):', filteredForBorrowed);
   console.log('📊 Filtered count:', filteredForBorrowed.length);
   
   const borrowedBooksCount = filteredForBorrowed.reduce((sum, borrowing) => {
@@ -151,18 +155,24 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
   const overdueBorrowings = borrowings.filter((b) => b.status === 'overdue');
   const returningBorrowings = borrowings.filter((b) => b.status === 'returning');
   
-  console.log('📊 Filtered results:');
-  console.log('   - Total borrowings:', borrowings.length);
-  console.log('   - Pending:', pendingBorrowings.length, pendingBorrowings);
-  console.log('   - Active:', activeBorrowings.length, activeBorrowings);
-  console.log('   - Overdue:', overdueBorrowings.length, overdueBorrowings);
-  console.log('   - Returning:', returningBorrowings.length, returningBorrowings);
-  console.log('   - All statuses:', borrowings.map(b => b.status));
+  console.log('📊 ============ STATS CALCULATION ============');
+  console.log('📊 Total borrowings in system:', borrowings.length);
+  console.log('📊 Breakdown by status:');
+  console.log('   - Pending (belum konfirmasi):', pendingBorrowings.length);
+  console.log('   - Active (sedang dipinjam):', activeBorrowings.length);
+  console.log('   - Overdue (terlambat):', overdueBorrowings.length);
+  console.log('   - Returning (proses pengembalian):', returningBorrowings.length);
+  console.log('📊 All statuses:', borrowings.map(b => `${b.id}: ${b.status}`));
+  console.log('📊 Borrowed books count (active+overdue+returning):', borrowedBooksCount);
+  
+  if (pendingBorrowings.length > 0) {
+    console.log('⚠️ ADA BORROWINGS PENDING! Konfirmasi dulu di tab "Konfirmasi Peminjaman"');
+  }
 
-  // Get unique users who have borrowed
+  // Get unique users who have borrowed (CONFIRMED only, not pending)
   const borrowedByUsers = new Set(
     borrowings
-      .filter(b => b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning')
+      .filter(b => b.status === 'active' || b.status === 'overdue' || b.status === 'returning')
       .map(b => b.userId)
   ).size;
 
@@ -200,6 +210,20 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
   const getUser = (userId: string) => users.find(u => u.id === userId);
   const getBook = (bookId: string) => books.find(b => b.id === bookId);
 
+  // STOCK VALIDATION
+  console.log('📊 ═══════════ STOCK VALIDATION ═══════════');
+  console.log(`📊 Total books in system: ${totalBooks} books across ${books.length} titles`);
+  console.log(`📊 Currently borrowed: ${borrowedBooksCount} books`);
+  console.log(`📊 Available (calculated): ${availableBooks} books`);
+  console.log(`📊 Formula: Available = Total (${totalBooks}) - Borrowed (${borrowedBooksCount})`);
+  if (totalBooks !== availableBooks + borrowedBooksCount) {
+    console.error(`📊 ❌ MISMATCH! Total (${totalBooks}) ≠ Available (${availableBooks}) + Borrowed (${borrowedBooksCount})`);
+    console.error(`📊    Difference: ${Math.abs(totalBooks - (availableBooks + borrowedBooksCount))} books`);
+  } else {
+    console.log(`📊 ✅ Stock calculation CORRECT!`);
+  }
+  console.log('📊 ═══════════════════════════════════════');
+
   const stats = [
     {
       title: 'Total Stok Buku Tersedia',
@@ -214,7 +238,7 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
       title: 'Buku Dipinjam',
       value: borrowedBooksCount,
       subtitle: borrowedBooksCount > 0 
-        ? `${borrowedByUsers} anggota • ${activeBorrowings.length + pendingBorrowings.length + returningBorrowings.length} invoice`
+        ? `${borrowedByUsers} anggota • ${activeBorrowings.length + returningBorrowings.length} invoice`
         : 'Belum ada buku dipinjam',
       icon: TrendingUp,
       color: 'text-teal-400',
@@ -223,14 +247,24 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
       onClick: () => setDetailView({ type: 'borrowed' }),
     },
     {
-      title: 'Menunggu Konfirmasi',
+      title: 'Konfirmasi Peminjaman',
       value: pendingBorrowings.length,
-      subtitle: 'invoice pending',
+      subtitle: pendingBorrowings.length > 0 ? `${pendingBorrowings.length} invoice menunggu` : 'Tidak ada pending',
       icon: Clock,
       color: 'text-orange-400',
       bgColor: 'bg-gradient-to-br from-orange-950/40 to-amber-950/40 border border-orange-800/30',
       clickable: true,
       onClick: () => setDetailView({ type: 'pending' }),
+    },
+    {
+      title: 'Konfirmasi Pengembalian',
+      value: returningBorrowings.length,
+      subtitle: returningBorrowings.length > 0 ? `${returningBorrowings.length} invoice menunggu` : 'Tidak ada pending',
+      icon: Package,
+      color: 'text-blue-400',
+      bgColor: 'bg-gradient-to-br from-blue-950/40 to-indigo-950/40 border border-blue-800/30',
+      clickable: true,
+      onClick: () => setDetailView({ type: 'returning' }),
     },
     {
       title: 'Keterlambatan',
@@ -354,13 +388,13 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
     switch (detailView.type) {
       case 'borrowed':
         title = 'Detail Buku Sedang Dipinjam';
-        description = `Total ${borrowedBooksCount} eksemplar buku sedang dipinjam oleh ${borrowedByUsers} anggota (${activeBorrowings.length + pendingBorrowings.length + returningBorrowings.length} invoice peminjaman)`;
+        description = `Total ${borrowedBooksCount} eksemplar buku sedang dipinjam oleh ${borrowedByUsers} anggota (${activeBorrowings.length + returningBorrowings.length} invoice peminjaman)`;
         data = borrowings.filter(b => 
-          b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning'
+          b.status === 'active' || b.status === 'overdue' || b.status === 'returning'
         );
         break;
       case 'pending':
-        title = 'Menunggu Konfirmasi';
+        title = 'Konfirmasi Peminjaman';
         description = `${pendingBorrowings.length} peminjaman menunggu konfirmasi admin`;
         data = pendingBorrowings;
         break;
@@ -375,7 +409,7 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
         data = overdueBorrowings;
         break;
       case 'returning':
-        title = 'Menunggu Pengembalian';
+        title = 'Konfirmasi Pengembalian';
         description = `${returningBorrowings.length} peminjaman menunggu konfirmasi pengembalian`;
         data = returningBorrowings;
         break;
@@ -415,7 +449,7 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm text-gray-200">{stat.title}</CardTitle>
               <div className="flex items-center gap-2">
-                {(index === 0 || index === 1 || index === 2 || index === 3) && (
+                {(index === 0 || index === 1 || index === 2 || index === 3 || index === 4) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30" onClick={(e) => e.stopPropagation()}>
@@ -427,7 +461,8 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
                         if (index === 0) handleExportBooks('excel');
                         else if (index === 1) handleExportBorrowings('excel', 'borrowed');
                         else if (index === 2) handleExportBorrowings('excel', 'pending');
-                        else if (index === 3) handleExportBorrowings('excel', 'overdue');
+                        else if (index === 3) handleExportBorrowings('excel', 'returning');
+                        else if (index === 4) handleExportBorrowings('excel', 'overdue');
                       }}>
                         <FileSpreadsheet className="w-4 h-4 mr-2" />
                         Export Excel
@@ -436,7 +471,8 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
                         if (index === 0) handleExportBooks('pdf');
                         else if (index === 1) handleExportBorrowings('pdf', 'borrowed');
                         else if (index === 2) handleExportBorrowings('pdf', 'pending');
-                        else if (index === 3) handleExportBorrowings('pdf', 'overdue');
+                        else if (index === 3) handleExportBorrowings('pdf', 'returning');
+                        else if (index === 4) handleExportBorrowings('pdf', 'overdue');
                       }}>
                         <FileText className="w-4 h-4 mr-2" />
                         Export PDF
@@ -614,58 +650,6 @@ export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps
           </CardContent>
         </Card>
       </div>
-
-      {/* Collection Stats */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-gray-200">
-              <BookOpen className="w-5 h-5" />
-              Statistik Koleksi
-            </CardTitle>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="border-emerald-700 text-emerald-400 hover:bg-emerald-950/30 hover:text-emerald-300">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleExportBooks('excel')}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Export Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExportBooks('pdf')}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Export PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border dark:border-blue-800">
-              <p className="text-2xl mb-1 text-blue-600 dark:text-blue-400">{books.length}</p>
-              <p className="text-sm text-gray-900 dark:text-gray-100">Judul Buku</p>
-            </div>
-            <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border dark:border-green-800">
-              <p className="text-2xl mb-1 text-green-600 dark:text-green-400">{totalBooks}</p>
-              <p className="text-sm text-gray-900 dark:text-gray-100">Total Stok</p>
-            </div>
-            <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border dark:border-purple-800">
-              <p className="text-2xl mb-1 text-purple-600 dark:text-purple-400">{borrowedBooksCount}</p>
-              <p className="text-sm text-gray-900 dark:text-gray-100">Sedang Dipinjam</p>
-            </div>
-            <div className="text-center p-4 bg-orange-50 dark:bg-orange-950/30 rounded-lg border dark:border-orange-800">
-              <p className="text-2xl mb-1 text-orange-600 dark:text-orange-400">
-                {books.filter(b => b.stock === 0).length}
-              </p>
-              <p className="text-sm text-gray-900 dark:text-gray-100">Stok Habis</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Detail Dialog */}
       {renderDetailDialog()}

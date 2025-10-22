@@ -1,6 +1,6 @@
 import { Borrowing, Book, User } from '../types';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Printer, X, FileDown } from 'lucide-react';
 import { useRef } from 'react';
 import { jsPDF } from 'jspdf';
@@ -160,6 +160,9 @@ export function PrintReceipt({
                 </Button>
               </div>
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Nota {type === 'borrow' ? 'peminjaman' : 'pengembalian'} buku untuk invoice {borrowing.id}
+            </DialogDescription>
           </DialogHeader>
 
           {/* Thermal Receipt Style */}
@@ -225,7 +228,7 @@ export function PrintReceipt({
                 const book = books.find((b) => b.id === detail.bookId);
                 if (!book) return null;
                 return (
-                  <div key={detail.id} className="mb-2 pb-2 border-b border-gray-300">
+                  <div key={detail.bookId} className="mb-2 pb-2 border-b border-gray-300">
                     <div className="font-bold">{index + 1}. {book.title}</div>
                     <div className="text-gray-700 ml-3">by {book.author}</div>
                     <div className="flex justify-between ml-3 mt-1">

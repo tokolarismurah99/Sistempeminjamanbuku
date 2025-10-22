@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Book, Borrowing, User, CartItem, BorrowingDetail } from './types';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
@@ -73,6 +73,44 @@ export default function App() {
         detailCount: b.details?.length || 0
       })));
       
+      // VALIDATION: Check for duplicate bookIds in details
+      deserialized.forEach((b: any) => {
+        if (b.details && b.details.length > 0) {
+          const bookIds = b.details.map((d: any) => d.bookId);
+          const uniqueIds = new Set(bookIds);
+          if (bookIds.length !== uniqueIds.size) {
+            console.error(`⚠️⚠️⚠️ CORRUPTED DATA DETECTED in borrowing ${b.id}!`);
+            console.error('   Details have duplicate bookIds:', bookIds);
+            console.error('   This borrowing has corrupted data and may cause stock issues!');
+          }
+        }
+      });
+      
+      // VALIDATION: Check for duplicate borrowing IDs
+      const borrowingIds = deserialized.map((b: any) => b.id);
+      const uniqueBorrowingIds = new Set(borrowingIds);
+      if (borrowingIds.length !== uniqueBorrowingIds.size) {
+        console.error('⚠️⚠️⚠️ DUPLICATE BORROWING IDs DETECTED IN LOCALSTORAGE!');
+        console.error('   Borrowing IDs:', borrowingIds);
+        console.error('   Unique IDs:', Array.from(uniqueBorrowingIds));
+        console.error('   This will cause DOUBLE STOCK REDUCTION!');
+      }
+      
+      // VALIDATION: Check for multiple borrowings with same bookId+userId combo
+      const activeborrowings = deserialized.filter((b: any) => b.status === 'active' || b.status === 'overdue' || b.status === 'returning');
+      activeborrowings.forEach((b: any) => {
+        b.details.forEach((detail: any) => {
+          const duplicates = activeborrowings.filter((other: any) => 
+            other.userId === b.userId && 
+            other.details.some((d: any) => d.bookId === detail.bookId)
+          );
+          if (duplicates.length > 1) {
+            console.warn(`⚠️ User ${b.userId} has ${duplicates.length} active borrowings for book ${detail.bookId}`);
+            console.warn('   Borrowing IDs:', duplicates.map((d: any) => d.id));
+          }
+        });
+      });
+      
       return deserialized;
     } catch (error) {
       console.error('📚 App.tsx - Error loading borrowings:', error);
@@ -105,18 +143,99 @@ export default function App() {
   } | null>(null);
 
   // ============================================
+  // REFS - Prevent Double Execution
+  // ============================================
+  
+  const confirmingBorrowingRef = useRef<Set<string>>(new Set());
+  const confirmingReturnRef = useRef<Set<string>>(new Set());
+  const lastBooksUpdateRef = useRef<number>(0);
+  const lastBorrowingsUpdateRef = useRef<number>(0);
+
+  // ============================================
   // EFFECTS - Save to localStorage
   // ============================================
 
-  // Force dark mode
+  // Force dark mode + Debug helpers
   useEffect(() => {
     document.documentElement.classList.add('dark');
     document.documentElement.style.colorScheme = 'dark';
     console.log('🌙 SmartLib Ubhara - Dark Mode PERMANENT');
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('  📚 SmartLib Ubhara - Debugging Protocol ACTIVE');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('');
+    console.log('🔍 TESTING PROTOCOL untuk Stock Bug:');
+    console.log('   1. Clear localStorage (jika perlu): localStorage.clear()');
+    console.log('   2. Reload page');
+    console.log('   3. Login sebagai member (budi/budi123)');
+    console.log('   4. Add 1 buku ke cart (pastikan quantity = 1)');
+    console.log('   5. Checkout');
+    console.log('   6. Login sebagai admin (admin/admin123)');
+    console.log('   7. Confirm borrowing');
+    console.log('   8. Check console logs untuk:');
+    console.log('      - Cart validation (duplicate books?)');
+    console.log('      - Borrowing details (quantity correct?)');
+    console.log('      - Stock reduction (actual vs expected)');
+    console.log('      - Duplicate borrowing IDs?');
+    console.log('      - Rapid fire state updates?');
+    console.log('');
+    console.log('🛠️  DEBUG HELPERS (run di console):');
+    console.log('   - window.debugStocks() = Tampilkan semua stock');
+    console.log('   - window.debugBorrowings() = Tampilkan semua borrowings');
+    console.log('   - window.debugCart() = Tampilkan cart saat ini');
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('');
+    
+    // Expose debug helpers
+    (window as any).debugStocks = () => {
+      const stored = localStorage.getItem('smartlib_books');
+      const books = stored ? JSON.parse(stored) : [];
+      console.table(books.map((b: any) => ({
+        Title: b.title,
+        Stock: b.stock,
+        Category: b.category,
+        ID: b.id
+      })));
+    };
+    
+    (window as any).debugBorrowings = () => {
+      const stored = localStorage.getItem('smartlib_borrowings');
+      const borrowings = stored ? JSON.parse(stored) : [];
+      console.log('Total borrowings:', borrowings.length);
+      borrowings.forEach((b: any) => {
+        console.log(`\nBorrowing ${b.id}:`);
+        console.log('  Status:', b.status);
+        console.log('  User ID:', b.userId);
+        console.log('  Details:', b.details);
+        console.log('  Total books:', b.details.reduce((sum: number, d: any) => sum + d.quantity, 0));
+      });
+    };
+    
+    (window as any).debugCart = () => {
+      console.log('Cart is session-only, check React state in component');
+      console.log('Open React DevTools to inspect cart state');
+    };
   }, []);
 
   // Save books to localStorage
   useEffect(() => {
+    const stockSummary = books.slice(0, 5).map(b => `${b.title}: ${b.stock}`);
+    console.log('💾 Books state changed. Saving to localStorage...');
+    console.log('💾 Stock summary:', stockSummary);
+    console.log('💾 Total books count:', books.length);
+    console.log('💾 Total stock across all books:', books.reduce((sum, b) => sum + b.stock, 0));
+    
+    // AUDIT: Check for negative stock
+    const negativeStockBooks = books.filter(b => b.stock < 0);
+    if (negativeStockBooks.length > 0) {
+      console.error('❌❌❌ NEGATIVE STOCK DETECTED!');
+      negativeStockBooks.forEach(b => {
+        console.error(`   "${b.title}": stock = ${b.stock}`);
+      });
+    }
+    
     localStorage.setItem('smartlib_books', JSON.stringify(books));
   }, [books]);
 
@@ -127,6 +246,8 @@ export default function App() {
 
   // Save borrowings to localStorage
   useEffect(() => {
+    console.log('💾 Saving borrowings to localStorage:', borrowings.length);
+    console.log('💾 Borrowings data:', borrowings);
     localStorage.setItem('smartlib_borrowings', JSON.stringify(borrowings));
   }, [borrowings]);
 
@@ -158,6 +279,40 @@ export default function App() {
     setCart([]);
     setActiveTab('catalog');
     toast.info('Anda telah keluar dari sistem');
+  };
+  
+  const handleResetData = () => {
+    if (confirm('⚠️ PERHATIAN! Ini akan menghapus semua data (borrowings, custom books, dll) dan reset ke data awal. Lanjutkan?')) {
+      console.log('🔄 ========== RESETTING ALL DATA ==========');
+      
+      // Clear ALL localStorage keys (including any potential corrupted data)
+      const keysToRemove = Object.keys(localStorage).filter(key => key.startsWith('smartlib_'));
+      keysToRemove.forEach(key => {
+        console.log(`🔄 Removing localStorage key: ${key}`);
+        localStorage.removeItem(key);
+      });
+      
+      // Clear refs
+      confirmingBorrowingRef.current.clear();
+      confirmingReturnRef.current.clear();
+      
+      // Reset to mock data
+      setBooks([...mockBooks]); // Create fresh copy
+      setUsers([demoMember, adminUser]);
+      setBorrowings([]);
+      setCurrentUser(null);
+      setCart([]);
+      setActiveTab('catalog');
+      
+      console.log('🔄 Mock books reset. Stock sample:', mockBooks.slice(0, 3).map(b => `${b.title}: ${b.stock}`));
+      toast.success('✅ Data berhasil direset ke kondisi awal!');
+      console.log('🔄 ==========================================');
+      
+      // Force page reload after 500ms to ensure clean state
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    }
   };
 
   const handleRegister = (name: string, email: string, password: string, phone: string, address: string) => {
@@ -234,12 +389,51 @@ export default function App() {
     }
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = (borrowDate: Date, dueDate: Date) => {
     if (!currentUser || cart.length === 0) return;
 
-    // Create borrowing details from cart
-    const details: BorrowingDetail[] = cart.map(item => {
+    console.log('🛒 ========== CHECKOUT ==========');
+    console.log('🛒 Cart items count (RAW):', cart.length);
+    console.log('🛒 Cart items detail (RAW):', cart);
+    
+    // 🔧 FIX #1: DEDUPLICATE cart before checkout
+    // Aggregate quantities for duplicate bookIds
+    const cartMap = new Map<string, CartItem>();
+    cart.forEach(item => {
+      const existing = cartMap.get(item.bookId);
+      if (existing) {
+        console.warn(`⚠️ DUPLICATE IN CART! Aggregating quantities for bookId: ${item.bookId}`);
+        console.warn(`   Existing qty: ${existing.quantity}, New qty: ${item.quantity}`);
+        cartMap.set(item.bookId, {
+          bookId: item.bookId,
+          quantity: existing.quantity + item.quantity
+        });
+      } else {
+        cartMap.set(item.bookId, { ...item });
+      }
+    });
+    
+    const deduplicatedCart = Array.from(cartMap.values());
+    
+    if (cart.length !== deduplicatedCart.length) {
+      console.error('❌❌❌ DUPLICATES FOUND IN CART!');
+      console.error(`   Original cart count: ${cart.length}`);
+      console.error(`   Deduplicated count: ${deduplicatedCart.length}`);
+    }
+    
+    console.log('🛒 Cart (AFTER DEDUPLICATION):', deduplicatedCart);
+    console.log('🛒 Cart breakdown:', deduplicatedCart.map(c => {
+      const book = books.find(b => b.id === c.bookId);
+      return `${book?.title || 'Unknown'}: quantity=${c.quantity}`;
+    }));
+    console.log('🛒 Total quantity in cart:', deduplicatedCart.reduce((sum, c) => sum + c.quantity, 0));
+    console.log('🛒 Borrow date:', borrowDate);
+    console.log('🛒 Due date:', dueDate);
+
+    // Create borrowing details from DEDUPLICATED cart
+    const details: BorrowingDetail[] = deduplicatedCart.map(item => {
       const book = books.find(b => b.id === item.bookId)!;
+      console.log(`🛒 Creating detail for "${book.title}": quantity = ${item.quantity}`);
       return {
         bookId: item.bookId,
         bookTitle: book.title,
@@ -249,20 +443,28 @@ export default function App() {
 
     // Generate barcode for borrowing confirmation
     const barcode = generateBarcode(currentUser.membershipId);
-    const borrowDate = new Date().toISOString().split('T')[0];
-    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const newBorrowing: Borrowing = {
       id: `borrow-${Date.now()}`,
       userId: currentUser.id,
       details,
-      borrowDate,
-      dueDate,
+      borrowDate: borrowDate,
+      dueDate: dueDate,
       status: 'pending',
       barcode,
     };
 
-    setBorrowings([...borrowings, newBorrowing]);
+    console.log('🛒 Creating new borrowing:', newBorrowing);
+    console.log('🛒 Total details:', details.length);
+    console.log('🛒 Details breakdown:', details.map(d => `${d.bookTitle}: qty=${d.quantity}`));
+    console.log('🛒 Current borrowings before:', borrowings.length);
+
+    const updatedBorrowings = [...borrowings, newBorrowing];
+    setBorrowings(updatedBorrowings);
+    
+    console.log('🛒 Updated borrowings after:', updatedBorrowings.length);
+    console.log('🛒 New borrowing status:', newBorrowing.status);
+
     setCurrentBorrowing(newBorrowing);
     setShowBarcodeDialog(true);
     setCart([]);
@@ -274,31 +476,191 @@ export default function App() {
   // ============================================
 
   const handleConfirmBorrowing = (borrowingId: string) => {
+    console.log('🎯 handleConfirmBorrowing called for:', borrowingId);
+    console.log('🎯 Current confirming ref:', Array.from(confirmingBorrowingRef.current));
+    
+    // Guard: Prevent double execution using ref
+    if (confirmingBorrowingRef.current.has(borrowingId)) {
+      console.warn('⚠️⚠️⚠️ DOUBLE CALL BLOCKED! Already confirming:', borrowingId);
+      toast.error('Sedang memproses konfirmasi, mohon tunggu...');
+      return;
+    }
+    confirmingBorrowingRef.current.add(borrowingId);
+    console.log('🎯 Added to confirming ref. Updated ref:', Array.from(confirmingBorrowingRef.current));
+    
     const borrowing = borrowings.find((b) => b.id === borrowingId);
-    if (!borrowing) return;
+    if (!borrowing) {
+      console.error('❌ Borrowing not found:', borrowingId);
+      confirmingBorrowingRef.current.delete(borrowingId);
+      return;
+    }
+    
+    // Guard: Only confirm if status is 'pending'
+    if (borrowing.status !== 'pending') {
+      console.warn('⚠️ Borrowing sudah dikonfirmasi sebelumnya. Status:', borrowing.status);
+      toast.error('Peminjaman sudah dikonfirmasi sebelumnya!');
+      confirmingBorrowingRef.current.delete(borrowingId);
+      return;
+    }
+    
+    console.log('✅ ========== KONFIRMASI PEMINJAMAN ==========');
+    console.log('✅ Borrowing ID:', borrowingId);
+    console.log('✅ User ID:', borrowing.userId);
+    console.log('✅ Status SEBELUM:', borrowing.status);
+    console.log('✅ Total details array length (RAW):', borrowing.details.length);
+    console.log('✅ Details (RAW):', borrowing.details);
+    
+    // 🔧 FIX #1: DEDUPLICATE & AGGREGATE borrowing.details
+    // If there are duplicate bookIds, aggregate quantities
+    const detailsMap = new Map<string, BorrowingDetail>();
+    borrowing.details.forEach(detail => {
+      const existing = detailsMap.get(detail.bookId);
+      if (existing) {
+        console.warn(`⚠️ DUPLICATE DETECTED! Aggregating quantities for bookId: ${detail.bookId}`);
+        console.warn(`   Existing qty: ${existing.quantity}, New qty: ${detail.quantity}`);
+        detailsMap.set(detail.bookId, {
+          ...existing,
+          quantity: existing.quantity + detail.quantity
+        });
+      } else {
+        detailsMap.set(detail.bookId, { ...detail });
+      }
+    });
+    
+    const deduplicatedDetails = Array.from(detailsMap.values());
+    console.log('✅ Details (AFTER DEDUPLICATION):', deduplicatedDetails);
+    console.log('✅ Details breakdown:', deduplicatedDetails.map(d => `${d.bookTitle}: qty=${d.quantity}, bookId=${d.bookId}`));
+    console.log('✅ Total quantity dalam borrowing:', deduplicatedDetails.reduce((sum, d) => sum + d.quantity, 0));
+    console.log('✅ Borrow Date:', borrowing.borrowDate);
+    console.log('✅ Due Date:', borrowing.dueDate);
+    
+    if (borrowing.details.length !== deduplicatedDetails.length) {
+      console.error('❌❌❌ DUPLICATES WERE FOUND AND REMOVED!');
+      console.error(`   Original details count: ${borrowing.details.length}`);
+      console.error(`   Deduplicated count: ${deduplicatedDetails.length}`);
+    }
+    
+    // Check if there are other borrowings affecting the same books
+    deduplicatedDetails.forEach(detail => {
+      const otherActiveBorrowings = borrowings.filter(b => 
+        b.id !== borrowingId && 
+        (b.status === 'active' || b.status === 'overdue' || b.status === 'returning') &&
+        b.details.some(d => d.bookId === detail.bookId)
+      );
+      if (otherActiveBorrowings.length > 0) {
+        console.warn(`⚠️ Book "${detail.bookTitle}" is also in ${otherActiveBorrowings.length} other active borrowings:`);
+        otherActiveBorrowings.forEach(b => {
+          const bookDetail = b.details.find(d => d.bookId === detail.bookId);
+          console.warn(`   - Borrowing ${b.id} (${b.status}): ${bookDetail?.quantity || 0}x`);
+        });
+      }
+    });
 
-    // Update book stock
+    // 🔧 FIX #2: Validate stock availability BEFORE reduction
+    let hasStockIssue = false;
+    deduplicatedDetails.forEach(detail => {
+      const book = books.find(b => b.id === detail.bookId);
+      if (!book) {
+        console.error(`❌ Book not found: ${detail.bookId}`);
+        hasStockIssue = true;
+      } else if (book.stock < detail.quantity) {
+        console.error(`❌ Insufficient stock for "${book.title}": need ${detail.quantity}, have ${book.stock}`);
+        hasStockIssue = true;
+      }
+    });
+    
+    if (hasStockIssue) {
+      toast.error('Stok tidak mencukupi untuk beberapa buku!');
+      confirmingBorrowingRef.current.delete(borrowingId);
+      return;
+    }
+
+    // 🔧 FIX #3: Use deduplicated details for stock update
     const updatedBooks = books.map((book) => {
-      const detail = borrowing.details.find((d) => d.bookId === book.id);
+      const detail = deduplicatedDetails.find((d) => d.bookId === book.id);
       if (detail) {
-        return { ...book, stock: book.stock - detail.quantity };
+        const newStock = book.stock - detail.quantity;
+        console.log(`✅ Mengurangi stock buku "${book.title}": ${book.stock} - ${detail.quantity} = ${newStock}`);
+        console.log(`✅   - Book ID: ${book.id}`);
+        console.log(`✅   - Detail quantity: ${detail.quantity}`);
+        console.log(`✅   - Stock BEFORE: ${book.stock}`);
+        console.log(`✅   - Stock AFTER: ${newStock}`);
+        return { ...book, stock: newStock };
       }
       return book;
     });
+    
+    console.log('✅ Books BEFORE update:');
+    deduplicatedDetails.forEach(d => {
+      const beforeBook = books.find(b => b.id === d.bookId);
+      if (beforeBook) console.log(`   ${beforeBook.title}: stock = ${beforeBook.stock}`);
+    });
+    
+    console.log('✅ Books AFTER update:');
+    deduplicatedDetails.forEach(d => {
+      const afterBook = updatedBooks.find(b => b.id === d.bookId);
+      const beforeBook = books.find(b => b.id === d.bookId);
+      if (afterBook && beforeBook) {
+        const actualReduction = beforeBook.stock - afterBook.stock;
+        const expectedReduction = d.quantity;
+        console.log(`   ${afterBook.title}: stock = ${afterBook.stock}`);
+        console.log(`      Actual reduction: ${actualReduction}, Expected: ${expectedReduction}`);
+        if (actualReduction !== expectedReduction) {
+          console.error(`      ❌❌❌ MISMATCH! Stock reduction tidak sesuai!`);
+        }
+      }
+    });
 
-    // Update borrowing status
+    // 🔧 FIX #4: Update borrowing with DEDUPLICATED details AND status change
     const updatedBorrowings = borrowings.map((b) =>
-      b.id === borrowingId ? { ...b, status: 'borrowed' as const } : b
+      b.id === borrowingId ? { ...b, details: deduplicatedDetails, status: 'active' as const } : b
     );
+    
+    console.log('✅ Status SETELAH: active');
+    console.log('✅ Updated borrowing:', updatedBorrowings.find(b => b.id === borrowingId));
+    console.log('✅ ========================================');
 
+    console.log('🎯 ========== UPDATING STATE ==========');
+    console.log('🎯 About to call setBooks with updated stock');
+    console.log('🎯 About to call setBorrowings with status=active AND deduplicated details');
+    
+    const now = Date.now();
+    const timeSinceLastBooksUpdate = now - lastBooksUpdateRef.current;
+    const timeSinceLastBorrowingsUpdate = now - lastBorrowingsUpdateRef.current;
+    
+    console.log(`🎯 Time since last books update: ${timeSinceLastBooksUpdate}ms`);
+    console.log(`🎯 Time since last borrowings update: ${timeSinceLastBorrowingsUpdate}ms`);
+    
+    if (timeSinceLastBooksUpdate < 100) {
+      console.error('❌❌❌ RAPID FIRE DETECTED! Books updated less than 100ms ago!');
+      console.error('   This might be causing double stock reduction!');
+    }
+    
+    lastBooksUpdateRef.current = now;
+    lastBorrowingsUpdateRef.current = now;
+    
+    // 🔧 FIX #5: Atomic-like update - both or nothing
     setBooks(updatedBooks);
     setBorrowings(updatedBorrowings);
 
-    // Show print dialog
-    setPrintData({ borrowing: { ...borrowing, status: 'borrowed' }, type: 'borrow' });
+    console.log('🎯 State update called. Books and Borrowings should update now.');
+    console.log('🎯 =====================================');
+
+    // Show print dialog with deduplicated details
+    setPrintData({ 
+      borrowing: { ...borrowing, details: deduplicatedDetails, status: 'active' }, 
+      type: 'borrow' 
+    });
     setShowPrintDialog(true);
 
     toast.success('Peminjaman berhasil dikonfirmasi!');
+    
+    // Clean up ref after a delay to prevent immediate re-confirmation
+    setTimeout(() => {
+      console.log('🎯 Cleaning up confirming ref for:', borrowingId);
+      confirmingBorrowingRef.current.delete(borrowingId);
+      console.log('🎯 Ref after cleanup:', Array.from(confirmingBorrowingRef.current));
+    }, 2000); // Increased to 2 seconds for extra safety
   };
 
   // ============================================
@@ -335,19 +697,49 @@ export default function App() {
   // ============================================
 
   const handleConfirmReturn = (borrowingId: string) => {
+    // Guard: Prevent double execution using ref
+    if (confirmingReturnRef.current.has(borrowingId)) {
+      console.warn('⚠️ DOUBLE CALL DETECTED! Already confirming return:', borrowingId);
+      return;
+    }
+    confirmingReturnRef.current.add(borrowingId);
+    
     const borrowing = borrowings.find((b) => b.id === borrowingId);
-    if (!borrowing) return;
+    if (!borrowing) {
+      console.error('❌ Borrowing not found:', borrowingId);
+      confirmingReturnRef.current.delete(borrowingId);
+      return;
+    }
+    
+    // Guard: Only confirm return if status is 'returning'
+    if (borrowing.status !== 'returning') {
+      console.warn('⚠️ Pengembalian tidak dalam status returning. Status:', borrowing.status);
+      toast.error('Status peminjaman tidak valid untuk pengembalian!');
+      confirmingReturnRef.current.delete(borrowingId);
+      return;
+    }
+    
+    console.log('📦 ========== KONFIRMASI PENGEMBALIAN ==========');
+    console.log('📦 Borrowing ID:', borrowingId);
+    console.log('📦 Status SEBELUM:', borrowing.status);
+    console.log('📦 Details:', borrowing.details);
 
     const returnDate = new Date().toISOString().split('T')[0];
     const dueDate = new Date(borrowing.dueDate);
     const returnDateObj = new Date(returnDate);
     const daysLate = Math.max(0, Math.floor((returnDateObj.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const lateFee = daysLate * 2000;
+    const totalBooksInBorrowing = borrowing.details.reduce((sum, detail) => sum + detail.quantity, 0);
+    const lateFee = daysLate * totalBooksInBorrowing * 2000;
+    
+    console.log('📦 Days late:', daysLate);
+    console.log('📦 Total books:', totalBooksInBorrowing);
+    console.log('📦 Late fee:', lateFee);
 
     // Return books to stock
     const updatedBooks = books.map((book) => {
       const detail = borrowing.details.find((d) => d.bookId === book.id);
       if (detail) {
+        console.log(`📦 Mengembalikan stock buku "${book.title}": ${book.stock} + ${detail.quantity} = ${book.stock + detail.quantity}`);
         return { ...book, stock: book.stock + detail.quantity };
       }
       return book;
@@ -362,6 +754,9 @@ export default function App() {
 
     setBooks(updatedBooks);
     setBorrowings(updatedBorrowings);
+    
+    console.log('📦 Status SETELAH: returned');
+    console.log('📦 ==========================================');
 
     // Show print dialog
     const updatedBorrowing = updatedBorrowings.find(b => b.id === borrowingId);
@@ -380,6 +775,11 @@ export default function App() {
     } else {
       toast.success('Pengembalian berhasil dikonfirmasi!');
     }
+    
+    // Clean up ref after a delay
+    setTimeout(() => {
+      confirmingReturnRef.current.delete(borrowingId);
+    }, 1000);
   };
 
   // ============================================
@@ -502,6 +902,18 @@ export default function App() {
                     <UserIcon className="w-4 h-4 mr-2" />
                     Edit Profil
                   </DropdownMenuItem>
+                  {currentUser.role === 'admin' && (
+                    <>
+                      <DropdownMenuSeparator className="bg-slate-700" />
+                      <DropdownMenuItem 
+                        onClick={handleResetData}
+                        className="text-yellow-400 hover:bg-yellow-950/30 focus:bg-yellow-950/30 focus:text-yellow-300 cursor-pointer"
+                      >
+                        <Database className="w-4 h-4 mr-2" />
+                        Reset Data
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator className="bg-slate-700" />
                   <DropdownMenuItem 
                     onClick={handleLogout}
@@ -551,6 +963,18 @@ export default function App() {
                     <UserIcon className="w-4 h-4 mr-2" />
                     Edit Profil
                   </DropdownMenuItem>
+                  {currentUser.role === 'admin' && (
+                    <>
+                      <DropdownMenuSeparator className="bg-slate-700" />
+                      <DropdownMenuItem 
+                        onClick={handleResetData}
+                        className="text-yellow-400 hover:bg-yellow-950/30 focus:bg-yellow-950/30 focus:text-yellow-300 cursor-pointer"
+                      >
+                        <Database className="w-4 h-4 mr-2" />
+                        Reset Data
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator className="bg-slate-700" />
                   <DropdownMenuItem 
                     onClick={handleLogout}
@@ -706,8 +1130,9 @@ export default function App() {
                   cart={cart}
                   books={books}
                   onUpdateQuantity={handleUpdateCartQuantity}
-                  onRemove={handleRemoveFromCart}
+                  onRemoveItem={handleRemoveFromCart}
                   onCheckout={handleCheckout}
+                  onClearCart={() => setCart([])}
                 />
               </TabsContent>
 
@@ -732,26 +1157,13 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900 border-t border-slate-700 mt-16">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-center md:text-left">
-              <p className="text-sm text-gray-300">
-                &copy; 2025 SmartLib Ubhara. All rights reserved.
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Universitas Bhayangkara Jakarta Raya
-              </p>
-            </div>
-            <div className="flex gap-6">
-              <a href="#" className="text-sm text-gray-400 hover:text-emerald-400 transition-colors">
-                Tentang
-              </a>
-              <a href="#" className="text-sm text-gray-400 hover:text-emerald-400 transition-colors">
-                Bantuan
-              </a>
-              <a href="#" className="text-sm text-gray-400 hover:text-emerald-400 transition-colors">
-                Kontak
-              </a>
-            </div>
+          <div className="flex flex-col items-center text-center gap-2">
+            <p className="text-sm text-gray-300">
+              &copy; 2025 SmartLib Ubhara. All rights reserved.
+            </p>
+            <p className="text-xs text-gray-400">
+              Universitas Bhayangkara Jakarta Raya
+            </p>
           </div>
         </div>
       </footer>
@@ -759,7 +1171,7 @@ export default function App() {
       {/* Barcode Display Dialog */}
       {currentBorrowing && (
         <BarcodeDisplay
-          barcode={currentBorrowing.barcode || currentBorrowing.returnBarcode || ''}
+          barcode={currentBorrowing.returnBarcode || currentBorrowing.barcode || ''}
           bookTitle={`${currentBorrowing.details.length} Buku`}
           dueDate={currentBorrowing.dueDate}
           open={showBarcodeDialog}

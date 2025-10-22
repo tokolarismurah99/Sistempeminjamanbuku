@@ -125,7 +125,7 @@ export function AdminBookManagement({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Buku</CardDescription>
@@ -134,19 +134,6 @@ export function AdminBookManagement({
             <div className="flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-emerald-400" />
               <span className="text-2xl text-gray-100">{filteredBooks.length}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Stok</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <PackagePlus className="w-4 h-4 text-green-600" />
-              <span className="text-2xl text-gray-100">
-                {filteredBooks.reduce((sum, book) => sum + book.stock, 0)}
-              </span>
             </div>
           </CardContent>
         </Card>

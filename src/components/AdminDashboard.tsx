@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Book, Borrowing, User, Activity } from '../types';
+import { Book, Borrowing, User } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { BookOpen, Users, TrendingUp, AlertTriangle, Clock, Package, ChevronRight, Calendar, User as UserIcon, FileSpreadsheet, FileText, Download } from 'lucide-react';
 import { Badge } from './ui/badge';
@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { format, differenceInDays } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { ActivityLog } from './ActivityLog';
 import { 
   exportToExcel, 
   exportToPDF, 
@@ -29,7 +28,6 @@ interface AdminDashboardProps {
   books: Book[];
   borrowings: Borrowing[];
   users: User[];
-  activities: Activity[];
 }
 
 type DetailView = 
@@ -40,8 +38,23 @@ type DetailView =
   | { type: 'returning' }
   | null;
 
-export function AdminDashboard({ books, borrowings, users, activities }: AdminDashboardProps) {
+export function AdminDashboard({ books, borrowings, users }: AdminDashboardProps) {
   const [detailView, setDetailView] = useState<DetailView>(null);
+
+  // Debug: Log received props
+  console.log('📊 AdminDashboard - Received borrowings:', borrowings.length);
+  console.log('📊 AdminDashboard - Borrowings:', borrowings);
+  
+  if (borrowings.length > 0) {
+    console.log('📊 First borrowing sample:', {
+      id: borrowings[0].id,
+      status: borrowings[0].status,
+      statusType: typeof borrowings[0].status,
+      details: borrowings[0].details,
+      borrowDate: borrowings[0].borrowDate,
+      dueDate: borrowings[0].dueDate
+    });
+  }
 
   // Export handlers
   const handleExportBooks = (format: 'excel' | 'pdf') => {
@@ -57,7 +70,12 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
     let filteredBorrowings = borrowings;
     let title = 'Data Peminjaman';
     
-    if (status === 'active') {
+    if (status === 'borrowed') {
+      filteredBorrowings = borrowings.filter(b => 
+        b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning'
+      );
+      title = 'Buku Dipinjam';
+    } else if (status === 'active') {
       filteredBorrowings = activeBorrowings;
       title = 'Peminjaman Aktif';
     } else if (status === 'pending') {
@@ -109,11 +127,20 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
   const totalBooks = books.reduce((sum, book) => sum + book.stock, 0);
   
   // Calculate borrowed books from active borrowings
-  const borrowedBooksCount = borrowings
-    .filter((b) => b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning')
-    .reduce((sum, borrowing) => {
-      return sum + borrowing.details.reduce((detailSum, detail) => detailSum + detail.quantity, 0);
-    }, 0);
+  const filteredForBorrowed = borrowings.filter((b) => 
+    b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning'
+  );
+  
+  console.log('📊 Filtered borrowings for count:', filteredForBorrowed);
+  console.log('📊 Filtered count:', filteredForBorrowed.length);
+  
+  const borrowedBooksCount = filteredForBorrowed.reduce((sum, borrowing) => {
+    const detailCount = borrowing.details.reduce((detailSum, detail) => detailSum + detail.quantity, 0);
+    console.log(`   Borrowing ${borrowing.id}: ${detailCount} books`);
+    return sum + detailCount;
+  }, 0);
+  
+  console.log('📊 Total borrowedBooksCount:', borrowedBooksCount);
   
   const availableBooks = totalBooks - borrowedBooksCount;
 
@@ -123,6 +150,14 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
   );
   const overdueBorrowings = borrowings.filter((b) => b.status === 'overdue');
   const returningBorrowings = borrowings.filter((b) => b.status === 'returning');
+  
+  console.log('📊 Filtered results:');
+  console.log('   - Total borrowings:', borrowings.length);
+  console.log('   - Pending:', pendingBorrowings.length, pendingBorrowings);
+  console.log('   - Active:', activeBorrowings.length, activeBorrowings);
+  console.log('   - Overdue:', overdueBorrowings.length, overdueBorrowings);
+  console.log('   - Returning:', returningBorrowings.length, returningBorrowings);
+  console.log('   - All statuses:', borrowings.map(b => b.status));
 
   // Get unique users who have borrowed
   const borrowedByUsers = new Set(
@@ -134,7 +169,7 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
   // Calculate late fees
   const calculateLateFee = (borrowing: Borrowing) => {
     const today = new Date();
-    const dueDate = borrowing.dueDate;
+    const dueDate = borrowing.dueDate instanceof Date ? borrowing.dueDate : new Date(borrowing.dueDate);
     const daysLate = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
     const totalBooksInBorrowing = borrowing.details.reduce((sum, detail) => sum + detail.quantity, 0);
     return daysLate * totalBooksInBorrowing * 2000;
@@ -167,9 +202,9 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
 
   const stats = [
     {
-      title: 'Total Stok Buku',
-      value: totalBooks,
-      subtitle: `${books.length} judul`,
+      title: 'Total Stok Buku Tersedia',
+      value: availableBooks,
+      subtitle: `${books.length} judul • ${availableBooks} eks siap dipinjam`,
       icon: BookOpen,
       color: 'text-emerald-400',
       bgColor: 'bg-gradient-to-br from-emerald-950/40 to-teal-950/40 border border-emerald-800/30',
@@ -178,8 +213,10 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
     {
       title: 'Buku Dipinjam',
       value: borrowedBooksCount,
-      subtitle: `${borrowedByUsers} orang`,
-      icon: Package,
+      subtitle: borrowedBooksCount > 0 
+        ? `${borrowedByUsers} anggota • ${activeBorrowings.length + pendingBorrowings.length + returningBorrowings.length} invoice`
+        : 'Belum ada buku dipinjam',
+      icon: TrendingUp,
       color: 'text-teal-400',
       bgColor: 'bg-gradient-to-br from-teal-950/40 to-cyan-950/40 border border-teal-800/30',
       clickable: true,
@@ -188,7 +225,7 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
     {
       title: 'Menunggu Konfirmasi',
       value: pendingBorrowings.length,
-      subtitle: 'invoices',
+      subtitle: 'invoice pending',
       icon: Clock,
       color: 'text-orange-400',
       bgColor: 'bg-gradient-to-br from-orange-950/40 to-amber-950/40 border border-orange-800/30',
@@ -198,7 +235,7 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
     {
       title: 'Keterlambatan',
       value: overdueBorrowings.length,
-      subtitle: `Rp ${totalLateFees.toLocaleString('id-ID')}`,
+      subtitle: `Denda: Rp ${totalLateFees.toLocaleString('id-ID')}`,
       icon: AlertTriangle,
       color: 'text-red-400',
       bgColor: 'bg-gradient-to-br from-red-950/40 to-pink-950/40 border border-red-800/30',
@@ -210,7 +247,8 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
   const renderBorrowingDetail = (borrowing: Borrowing) => {
     const user = getUser(borrowing.userId);
     const lateFee = calculateLateFee(borrowing);
-    const daysLate = differenceInDays(new Date(), borrowing.dueDate);
+    const dueDate = borrowing.dueDate instanceof Date ? borrowing.dueDate : new Date(borrowing.dueDate);
+    const daysLate = differenceInDays(new Date(), dueDate);
     const totalBooks = borrowing.details.reduce((sum, d) => sum + d.quantity, 0);
 
     return (
@@ -228,12 +266,25 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
                 <p className="text-sm text-gray-400">{user?.membershipId}</p>
               </div>
             </div>
-            <div className="text-right">
-              <Badge variant="outline" className="mb-1">
-                {borrowing.barcode}
+            <div className="text-right space-y-1">
+              <Badge 
+                variant="outline" 
+                className={
+                  borrowing.status === 'active' ? 'bg-emerald-950/30 text-emerald-400 border-emerald-700' :
+                  borrowing.status === 'overdue' ? 'bg-red-950/30 text-red-400 border-red-700' :
+                  borrowing.status === 'pending' ? 'bg-orange-950/30 text-orange-400 border-orange-700' :
+                  borrowing.status === 'returning' ? 'bg-blue-950/30 text-blue-400 border-blue-700' :
+                  ''
+                }
+              >
+                {borrowing.status === 'active' && '✓ Aktif'}
+                {borrowing.status === 'overdue' && '⚠ Terlambat'}
+                {borrowing.status === 'pending' && '⏳ Pending'}
+                {borrowing.status === 'returning' && '↩ Returning'}
               </Badge>
+              <p className="text-xs text-gray-500">#{borrowing.barcode}</p>
               <p className="text-xs text-gray-400">
-                {totalBooks} buku • {borrowing.details.length} judul
+                {totalBooks} eks • {borrowing.details.length} judul
               </p>
             </div>
           </div>
@@ -242,11 +293,11 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
           <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-slate-800 rounded-lg">
             <div>
               <p className="text-xs text-gray-400 mb-1">Tanggal Pinjam</p>
-              <p className="text-sm text-gray-100">{format(borrowing.borrowDate, 'dd MMM yyyy', { locale: id })}</p>
+              <p className="text-sm text-gray-100">{format(borrowing.borrowDate instanceof Date ? borrowing.borrowDate : new Date(borrowing.borrowDate), 'dd MMM yyyy', { locale: id })}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 mb-1">Tanggal Kembali</p>
-              <p className="text-sm text-gray-100">{format(borrowing.dueDate, 'dd MMM yyyy', { locale: id })}</p>
+              <p className="text-sm text-gray-100">{format(borrowing.dueDate instanceof Date ? borrowing.dueDate : new Date(borrowing.dueDate), 'dd MMM yyyy', { locale: id })}</p>
             </div>
           </div>
 
@@ -266,12 +317,12 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
           {/* Books List */}
           <div className="space-y-2">
             <p className="text-sm text-gray-300 mb-2">Buku yang Dipinjam:</p>
-            {borrowing.details.map((detail) => {
+            {borrowing.details.map((detail, idx) => {
               const book = getBook(detail.bookId);
               if (!book) return null;
 
               return (
-                <div key={detail.id} className="flex items-center gap-3 p-2 bg-slate-800 border border-slate-600 rounded">
+                <div key={detail.id || `${detail.bookId}-${idx}`} className="flex items-center gap-3 p-2 bg-slate-800 border border-slate-600 rounded">
                   <div className="w-10 h-14 flex-shrink-0 rounded overflow-hidden bg-slate-700">
                     <ImageWithFallback
                       src={book.coverUrl}
@@ -302,8 +353,8 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
 
     switch (detailView.type) {
       case 'borrowed':
-        title = 'Buku Sedang Dipinjam';
-        description = `Total ${borrowedBooksCount} buku dipinjam oleh ${borrowedByUsers} orang`;
+        title = 'Detail Buku Sedang Dipinjam';
+        description = `Total ${borrowedBooksCount} eksemplar buku sedang dipinjam oleh ${borrowedByUsers} anggota (${activeBorrowings.length + pendingBorrowings.length + returningBorrowings.length} invoice peminjaman)`;
         data = borrowings.filter(b => 
           b.status === 'active' || b.status === 'overdue' || b.status === 'pending' || b.status === 'returning'
         );
@@ -364,33 +415,35 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm text-gray-200">{stat.title}</CardTitle>
               <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30" onClick={(e) => e.stopPropagation()}>
-                      <Download className="h-3.5 w-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => {
-                      if (index === 0) handleExportBooks('excel');
-                      else if (index === 1) handleExportBorrowings('excel', 'active');
-                      else if (index === 2) handleExportBorrowings('excel', 'pending');
-                      else if (index === 3) handleExportBorrowings('excel', 'overdue');
-                    }}>
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      Export Excel
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      if (index === 0) handleExportBooks('pdf');
-                      else if (index === 1) handleExportBorrowings('pdf', 'active');
-                      else if (index === 2) handleExportBorrowings('pdf', 'pending');
-                      else if (index === 3) handleExportBorrowings('pdf', 'overdue');
-                    }}>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Export PDF
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {(index === 0 || index === 1 || index === 2 || index === 3) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30" onClick={(e) => e.stopPropagation()}>
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        if (index === 0) handleExportBooks('excel');
+                        else if (index === 1) handleExportBorrowings('excel', 'borrowed');
+                        else if (index === 2) handleExportBorrowings('excel', 'pending');
+                        else if (index === 3) handleExportBorrowings('excel', 'overdue');
+                      }}>
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Export Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        if (index === 0) handleExportBooks('pdf');
+                        else if (index === 1) handleExportBorrowings('pdf', 'borrowed');
+                        else if (index === 2) handleExportBorrowings('pdf', 'pending');
+                        else if (index === 3) handleExportBorrowings('pdf', 'overdue');
+                      }}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Export PDF
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
                 <div 
                   className={`p-2 rounded-lg ${stat.bgColor} ${stat.clickable ? 'cursor-pointer' : ''}`}
                   onClick={stat.clickable ? stat.onClick : undefined}
@@ -613,9 +666,6 @@ export function AdminDashboard({ books, borrowings, users, activities }: AdminDa
           </div>
         </CardContent>
       </Card>
-
-      {/* Activity Log */}
-      <ActivityLog activities={activities} />
 
       {/* Detail Dialog */}
       {renderDetailDialog()}

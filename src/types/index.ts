@@ -31,9 +31,9 @@ export interface CartItem {
 
 // Detail Peminjaman - detail items dalam satu invoice peminjaman
 export interface BorrowingDetail {
-  id: string;
-  borrowingId: string; // id_peminjaman
+  id?: string; // optional id untuk tracking
   bookId: string; // id_buku
+  bookTitle: string; // judul buku (untuk display)
   quantity: number; // qty
 }
 
@@ -41,8 +41,10 @@ export interface BorrowingDetail {
 export interface Borrowing {
   id: string; // id_peminjaman
   userId: string; // id_anggota
-  borrowDate: Date; // tgl_pinjam - changed to Date
-  dueDate: Date; // tgl_kembali - changed to Date
+  borrowDate: Date | string; // tgl_pinjam (Date object in memory, string in localStorage)
+  dueDate: Date | string; // tgl_kembali (Date object in memory, string in localStorage)
+  returnDate?: Date | string; // tgl_pengembalian aktual
+  returnRequestDate?: Date | string; // tgl request pengembalian
   status: 'pending' | 'active' | 'returned' | 'overdue' | 'returning';
   barcode?: string;
   returnBarcode?: string;

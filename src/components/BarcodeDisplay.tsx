@@ -14,7 +14,7 @@ import Barcode from 'react-barcode';
 interface BarcodeDisplayProps {
   barcode: string;
   bookTitle: string;
-  dueDate: Date;
+  dueDate: Date | string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isReturn?: boolean;
@@ -28,6 +28,8 @@ export function BarcodeDisplay({
   onOpenChange,
   isReturn = false,
 }: BarcodeDisplayProps) {
+  // Convert dueDate to Date object if it's a string
+  const dueDateObj = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,7 +59,7 @@ export function BarcodeDisplay({
               <div>
                 <p className="text-sm text-gray-400">Tanggal Kembali</p>
                 <p className="font-medium text-gray-100">
-                  {dueDate.toLocaleDateString('id-ID', {
+                  {dueDateObj.toLocaleDateString('id-ID', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',

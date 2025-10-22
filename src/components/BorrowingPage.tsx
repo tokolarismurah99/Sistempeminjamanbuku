@@ -35,7 +35,7 @@ export function BorrowingPage({ borrowings, books, onReturn }: BorrowingPageProp
   const returnedBorrowings = borrowings.filter((b) => b.status === 'returned');
 
   const calculateLateFee = (borrowing: Borrowing, returnDate?: Date) => {
-    const due = borrowing.dueDate;
+    const due = borrowing.dueDate instanceof Date ? borrowing.dueDate : new Date(borrowing.dueDate);
     const returned = returnDate || new Date();
     const daysLate = differenceInDays(returned, due);
     const totalBooks = borrowing.details.reduce((sum, detail) => sum + detail.quantity, 0);
@@ -43,7 +43,8 @@ export function BorrowingPage({ borrowings, books, onReturn }: BorrowingPageProp
   };
 
   const BorrowingCard = ({ borrowing, showReturn = false }: { borrowing: Borrowing; showReturn?: boolean }) => {
-    const daysUntilDue = differenceInDays(borrowing.dueDate, new Date());
+    const dueDate = borrowing.dueDate instanceof Date ? borrowing.dueDate : new Date(borrowing.dueDate);
+    const daysUntilDue = differenceInDays(dueDate, new Date());
     const lateFee = calculateLateFee(borrowing);
     const totalBooks = borrowing.details.reduce((sum, detail) => sum + detail.quantity, 0);
 

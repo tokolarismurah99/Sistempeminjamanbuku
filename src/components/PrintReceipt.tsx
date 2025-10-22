@@ -6,7 +6,6 @@ import { useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { toast } from 'sonner@2.0.3';
-import { Logo } from './Logo';
 
 interface PrintReceiptProps {
   borrowing: Borrowing;
@@ -45,10 +44,8 @@ export function PrintReceipt({
     try {
       const loadingToast = toast.loading('Membuat PDF...');
       
-      // Wait a bit to ensure all content is rendered
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Create canvas from HTML
       const canvas = await html2canvas(element, {
         scale: 2,
         allowTaint: true,
@@ -71,8 +68,7 @@ export function PrintReceipt({
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       
-      // Calculate proper scaling
-      const imgWidthMM = imgWidth * 0.264583; // Convert px to mm
+      const imgWidthMM = imgWidth * 0.264583;
       const imgHeightMM = imgHeight * 0.264583;
       const scale = Math.min(pdfWidth / imgWidthMM, pdfHeight / imgHeightMM);
       
@@ -97,26 +93,32 @@ export function PrintReceipt({
 
   const totalBooks = borrowing.details.reduce((sum, detail) => sum + detail.quantity, 0);
   const formattedBorrowDate = new Date(borrowing.borrowDate).toLocaleDateString('id-ID', {
-    day: 'numeric',
-    month: 'long',
+    day: '2-digit',
+    month: '2-digit',
     year: 'numeric',
   });
   const formattedDueDate = new Date(borrowing.dueDate).toLocaleDateString('id-ID', {
-    day: 'numeric',
-    month: 'long',
+    day: '2-digit',
+    month: '2-digit',
     year: 'numeric',
   });
   const formattedReturnDate = borrowing.returnDate
     ? new Date(borrowing.returnDate).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
+        day: '2-digit',
+        month: '2-digit',
         year: 'numeric',
       })
     : new Date().toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
+        day: '2-digit',
+        month: '2-digit',
         year: 'numeric',
       });
+
+  const formattedTime = new Date().toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 
   return (
     <>
@@ -140,14 +142,14 @@ export function PrintReceipt({
         }
       `}</style>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader className="no-print">
             <DialogTitle className="flex items-center justify-between">
-              <span>{type === 'borrow' ? 'Bukti Peminjaman' : 'Bukti Pengembalian'}</span>
+              <span>Nota {type === 'borrow' ? 'Peminjaman' : 'Pengembalian'}</span>
               <div className="flex gap-2">
                 <Button onClick={handleExportPDF} size="sm" variant="outline">
                   <FileDown className="w-4 h-4 mr-2" />
-                  Export PDF
+                  PDF
                 </Button>
                 <Button onClick={handlePrint} size="sm">
                   <Printer className="w-4 h-4 mr-2" />
@@ -160,183 +162,170 @@ export function PrintReceipt({
             </DialogTitle>
           </DialogHeader>
 
-          <div ref={printRef} className="print-content">
-          <div className="receipt border-2 border-emerald-600 rounded-lg overflow-hidden">
+          {/* Thermal Receipt Style */}
+          <div ref={printRef} className="print-content bg-white p-6 text-black font-mono text-sm">
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-8 text-center">
-              <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-full p-2 flex items-center justify-center">
-                <Logo size="lg" />
-              </div>
-              <h1 className="text-2xl mb-2">SmartLib Ubhara</h1>
-              <p className="text-sm opacity-90">Perpustakaan Universitas Bhayangkara Jakarta Raya</p>
-              <p className="text-lg mt-3">
-                {type === 'borrow' ? '📚 BUKTI PEMINJAMAN BUKU' : '✅ BUKTI PENGEMBALIAN BUKU'}
-              </p>
+            <div className="text-center border-b-2 border-dashed border-black pb-3 mb-3">
+              <div className="text-base font-bold">SMARTLIB UBHARA</div>
+              <div className="text-xs mt-1">Perpustakaan</div>
+              <div className="text-xs">Universitas Bhayangkara</div>
+              <div className="text-xs">Jakarta Raya</div>
             </div>
 
-            {/* Content */}
-            <div className="p-8">
-              {/* Transaction Info */}
-              <div className="mb-6">
-                <h3 className="text-base mb-3 pb-2 border-b-2 border-gray-200 text-emerald-600">
-                  Informasi Transaksi
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">No. Transaksi</p>
-                    <p className="text-sm">{borrowing.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Tanggal {type === 'borrow' ? 'Peminjaman' : 'Pengembalian'}</p>
-                    <p className="text-sm">{type === 'borrow' ? formattedBorrowDate : formattedReturnDate}</p>
-                  </div>
-                </div>
+            {/* Transaction Type */}
+            <div className="text-center py-2 mb-3 border-b border-black">
+              <div className="font-bold text-base">
+                {type === 'borrow' ? 'BUKTI PEMINJAMAN' : 'BUKTI PENGEMBALIAN'}
               </div>
+            </div>
 
-              {/* Member Info */}
-              <div className="mb-6">
-                <h3 className="text-base mb-3 pb-2 border-b-2 border-gray-200 text-emerald-600">
-                  Data Anggota
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Nama Lengkap</p>
-                    <p className="text-sm">{user.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">ID Anggota</p>
-                    <p className="text-sm">{user.membershipId}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Email</p>
-                    <p className="text-sm">{user.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">No. Telepon</p>
-                    <p className="text-sm">{user.phone}</p>
-                  </div>
-                </div>
+            {/* Date & Time */}
+            <div className="text-xs mb-3 space-y-1">
+              <div className="flex justify-between">
+                <span>Tanggal</span>
+                <span>{type === 'borrow' ? formattedBorrowDate : formattedReturnDate}</span>
               </div>
-
-              {/* Books List */}
-              <div className="mb-6">
-                <h3 className="text-base mb-3 pb-2 border-b-2 border-gray-200 text-emerald-600">
-                  Daftar Buku
-                </h3>
-                <ul className="space-y-2">
-                  {borrowing.details.map((detail, index) => {
-                    const book = books.find((b) => b.id === detail.bookId);
-                    if (!book) return null;
-                    return (
-                      <li key={detail.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                        <div>
-                          <p className="text-sm">
-                            {index + 1}. {book.title}
-                          </p>
-                          <p className="text-xs text-gray-500">{book.author}</p>
-                        </div>
-                        <span className="text-sm text-emerald-600">{detail.quantity} eks</span>
-                      </li>
-                    );
-                  })}
-                </ul>
+              <div className="flex justify-between">
+                <span>Waktu</span>
+                <span>{formattedTime}</span>
               </div>
-
-              {/* Summary */}
-              <div className="bg-emerald-50 border-2 border-emerald-600 rounded-lg p-5">
-                <div className="flex justify-between items-center mb-2 text-sm">
-                  <span>Total Buku</span>
-                  <span className="text-emerald-600">{totalBooks} eksemplar</span>
-                </div>
-                {type === 'borrow' && (
-                  <>
-                    <div className="flex justify-between items-center mb-2 text-sm">
-                      <span>Tanggal Peminjaman</span>
-                      <span>{formattedBorrowDate}</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t-2 border-emerald-600">
-                      <span className="text-base">Batas Pengembalian</span>
-                      <span className="text-base">{formattedDueDate}</span>
-                    </div>
-                  </>
-                )}
-                {type === 'return' && (
-                  <>
-                    <div className="flex justify-between items-center mb-2 text-sm">
-                      <span>Batas Pengembalian</span>
-                      <span>{formattedDueDate}</span>
-                    </div>
-                    <div className="flex justify-between items-center mb-2 text-sm">
-                      <span>Tanggal Pengembalian</span>
-                      <span>{formattedReturnDate}</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t-2 border-emerald-600">
-                      <span className="text-base">Status</span>
-                      <span className="text-base">
-                        {daysLate > 0 ? `Terlambat ${daysLate} hari` : 'Tepat Waktu'}
-                      </span>
-                    </div>
-                  </>
-                )}
+              <div className="flex justify-between">
+                <span>No. Invoice</span>
+                <span className="font-bold">{borrowing.id}</span>
               </div>
+            </div>
 
-              {/* Late Fee Warning */}
-              {type === 'return' && lateFee > 0 && (
-                <div className="bg-amber-50 border-2 border-amber-500 rounded-lg p-4 mt-4 text-center">
-                  <p className="text-sm text-amber-800 mb-1">⚠️ Denda Keterlambatan</p>
-                  <p className="text-2xl text-red-600 my-2">Rp {lateFee.toLocaleString('id-ID')}</p>
-                  <p className="text-xs text-gray-600">
-                    {daysLate} hari × {totalBooks} buku × Rp 2.000 = Rp {lateFee.toLocaleString('id-ID')}
-                  </p>
-                </div>
+            {/* Divider */}
+            <div className="border-t border-dashed border-black my-3"></div>
+
+            {/* Member Info */}
+            <div className="text-xs mb-3 space-y-1">
+              <div className="font-bold mb-1">DATA ANGGOTA:</div>
+              <div className="flex justify-between">
+                <span>Nama</span>
+                <span className="font-bold">{user.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>ID</span>
+                <span>{user.membershipId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Telp</span>
+                <span>{user.phone}</span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-dashed border-black my-3"></div>
+
+            {/* Books List */}
+            <div className="text-xs mb-3">
+              <div className="font-bold mb-2">DAFTAR BUKU:</div>
+              {borrowing.details.map((detail, index) => {
+                const book = books.find((b) => b.id === detail.bookId);
+                if (!book) return null;
+                return (
+                  <div key={detail.id} className="mb-2 pb-2 border-b border-gray-300">
+                    <div className="font-bold">{index + 1}. {book.title}</div>
+                    <div className="text-gray-700 ml-3">by {book.author}</div>
+                    <div className="flex justify-between ml-3 mt-1">
+                      <span>Qty</span>
+                      <span className="font-bold">{detail.quantity} eks</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-dashed border-black my-3"></div>
+
+            {/* Summary */}
+            <div className="text-xs mb-3 space-y-1">
+              <div className="flex justify-between font-bold">
+                <span>TOTAL BUKU</span>
+                <span>{totalBooks} eksemplar</span>
+              </div>
+              
+              {type === 'borrow' && (
+                <>
+                  <div className="flex justify-between mt-2">
+                    <span>Tgl Pinjam</span>
+                    <span>{formattedBorrowDate}</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span>BATAS KEMBALI</span>
+                    <span>{formattedDueDate}</span>
+                  </div>
+                </>
               )}
 
-              {/* Barcode */}
-              <div className="bg-gray-50 rounded-lg p-5 mt-6 text-center">
-                <p className="text-xs text-gray-500 mb-2">Kode Barcode Transaksi</p>
-                <p className="font-mono text-lg tracking-wider">
-                  {type === 'borrow' ? borrowing.barcode : borrowing.returnBarcode}
-                </p>
-              </div>
+              {type === 'return' && (
+                <>
+                  <div className="flex justify-between">
+                    <span>Batas Kembali</span>
+                    <span>{formattedDueDate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tgl Kembali</span>
+                    <span>{formattedReturnDate}</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span>STATUS</span>
+                    <span>{daysLate > 0 ? `Terlambat ${daysLate} hari` : 'Tepat Waktu'}</span>
+                  </div>
+                </>
+              )}
+            </div>
 
-              {/* Signature Area */}
-              <div className="grid grid-cols-2 gap-10 mt-10">
-                <div className="text-center">
-                  <p className="text-sm mb-16">Petugas Perpustakaan</p>
-                  <div className="border-t border-gray-800 pt-2">
-                    <p className="text-xs text-gray-500">Tanda Tangan & Nama</p>
+            {/* Late Fee */}
+            {type === 'return' && lateFee > 0 && (
+              <>
+                <div className="border-t-2 border-black my-3"></div>
+                <div className="text-xs mb-3 space-y-1">
+                  <div className="text-center font-bold mb-2">⚠️ DENDA KETERLAMBATAN ⚠️</div>
+                  <div className="flex justify-between">
+                    <span>Keterlambatan</span>
+                    <span>{daysLate} hari</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tarif</span>
+                    <span>Rp 2.000/hari/buku</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-base mt-2">
+                    <span>TOTAL DENDA</span>
+                    <span>Rp {lateFee.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm mb-16">Anggota</p>
-                  <div className="border-t border-gray-800 pt-2">
-                    <p className="text-xs text-gray-500">{user.name}</p>
-                  </div>
-                </div>
+              </>
+            )}
+
+            {/* Divider */}
+            <div className="border-t border-dashed border-black my-3"></div>
+
+            {/* Barcode */}
+            <div className="text-center text-xs mb-3">
+              <div className="mb-1">Barcode</div>
+              <div className="font-bold tracking-widest text-base">
+                {type === 'borrow' ? borrowing.barcode : borrowing.returnBarcode}
               </div>
             </div>
+
+            {/* Divider */}
+            <div className="border-t border-dashed border-black my-3"></div>
 
             {/* Footer */}
-            <div className="bg-gray-50 p-5 text-center border-t-2 border-gray-200">
-              <p className="text-xs text-gray-500 mb-1">
-                Dokumen ini dicetak oleh sistem SmartLib Ubhara
-              </p>
-              <p className="text-xs text-gray-500">
-                {new Date().toLocaleDateString('id-ID', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </p>
-              <p className="text-xs text-gray-400 mt-2">
-                © 2024 Perpustakaan Universitas Bhayangkara Jakarta Raya
-              </p>
+            <div className="text-center text-xs space-y-1 mb-3">
+              <div>Terima kasih</div>
+              <div>Harap simpan bukti ini</div>
+              <div className="text-[10px] mt-2 text-gray-600">
+                Dicetak: {new Date().toLocaleString('id-ID')}
+              </div>
             </div>
+
+            {/* Bottom Border */}
+            <div className="border-b-2 border-dashed border-black"></div>
           </div>
-        </div>
         </DialogContent>
       </Dialog>
     </>

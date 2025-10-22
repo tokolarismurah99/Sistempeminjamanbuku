@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from './info';
-import { Book, User, Borrowing, Activity } from '../../types';
-import { mockBooks, currentUser, adminUser, mockBorrowings, mockActivities } from '../../data/mockData';
+import { Book, User, Borrowing } from '../../types';
+import { mockBooks, currentUser, adminUser, mockBorrowings } from '../../data/mockData';
 
 // Initialize Supabase client
 const supabaseUrl = `https://${projectId}.supabase.co`;
@@ -306,82 +306,6 @@ export function useBorrowings() {
   };
 
   return { borrowings, loading, error, addBorrowing, updateBorrowing };
-}
-
-// ============================================
-// ACTIVITIES HOOK
-// ============================================
-export function useActivities() {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch activities from Supabase (with fallback to mockData)
-  const fetchActivities = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('activities')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-
-      setActivities(data || []);
-      setError(null);
-      supabaseAvailable = true;
-    } catch (err: any) {
-      console.warn('⚠️ Supabase tidak tersedia, menggunakan mock data untuk activities');
-      supabaseAvailable = false;
-      setActivities(mockActivities);
-      setError(null); // Don't show error, fallback is working
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchActivities();
-
-    // Subscribe to real-time changes
-    const subscription = supabase
-      .channel('activities-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => {
-        fetchActivities();
-      })
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Add activity
-  const addActivity = async (activityData: Omit<Activity, 'id'>) => {
-    if (!supabaseAvailable) {
-      // Silently fail for activities in offline mode - not critical
-      console.warn('⚠️ Supabase tidak tersedia - activity log dilewati');
-      return { success: true, data: null }; // Return success to not break the flow
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('activities')
-        .insert([activityData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      return { success: true, data };
-    } catch (err: any) {
-      console.error('Error adding activity:', err);
-      return { success: false, error: err.message };
-    }
-  };
-
-  return { activities, loading, error, addActivity };
 }
 
 // Export supabase client for direct use if needed

@@ -1,4 +1,4 @@
-import { Book, Borrowing, User, Activity } from '../types';
+import { Book, Borrowing, User } from '../types';
 
 export const mockBooks: Book[] = [
   {
@@ -254,34 +254,3 @@ export const adminUser: User = {
 
 // Start with empty borrowings - no dummy data
 export const mockBorrowings: Borrowing[] = [];
-
-// Initial activity logs
-export const mockActivities: Activity[] = [
-  {
-    id: 'act-1',
-    userId: 'admin-001',
-    userName: 'Admin Perpustakaan',
-    userRole: 'admin',
-    action: 'login',
-    description: 'Admin login ke sistem',
-    timestamp: new Date('2024-12-20T08:30:00'),
-  },
-  {
-    id: 'act-2',
-    userId: 'member-001',
-    userName: 'Budi Santoso',
-    userRole: 'member',
-    action: 'register',
-    description: 'Pendaftaran anggota baru',
-    timestamp: new Date('2024-12-20T09:15:00'),
-  },
-  {
-    id: 'act-3',
-    userId: 'admin-001',
-    userName: 'Admin Perpustakaan',
-    userRole: 'admin',
-    action: 'book_add',
-    description: 'Menambahkan buku: "Laskar Pelangi" (5 eksemplar)',
-    timestamp: new Date('2024-12-20T10:00:00'),
-  },
-];

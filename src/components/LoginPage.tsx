@@ -31,7 +31,9 @@ export function LoginPage({ onLogin, onRegister, users, usersLoading = false }: 
     }
 
     // Cari user berdasarkan email atau membership ID
-    const user = users.find(
+    // Gunakan users prop jika tersedia, fallback ke mockData
+    const userList = users.length > 0 ? users : [currentUser, adminUser];
+    const user = userList.find(
       (u) =>
         u.email.toLowerCase() === email.toLowerCase() ||
         u.membershipId.toLowerCase() === email.toLowerCase()

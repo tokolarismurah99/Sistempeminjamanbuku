@@ -85,13 +85,8 @@ Fitur berikut akan menampilkan error "Database offline":
 }
 ```
 
-### 📝 Activities (3 demo logs)
-- Admin login ke sistem
-- Budi Santoso registrasi
-- Admin menambahkan buku Laskar Pelangi
-
 ### 📦 Borrowings
-- Kosong (tidak ada data peminjaman)
+- Kosong (tidak ada data peminjaman awal)
 
 ---
 

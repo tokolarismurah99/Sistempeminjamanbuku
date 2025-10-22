@@ -1,0 +1,10 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="60" cy="60" r="58" fill="#059669" stroke="#F97316" stroke-width="4"/>
+  <g transform="translate(60, 50)">
+    <rect x="-23" y="0" width="20" height="30" fill="white" rx="1"/>
+    <rect x="3" y="0" width="20" height="30" fill="white" rx="1"/>
+    <rect x="-3" y="0" width="6" height="30" fill="#F97316"/>
+  </g>
+  <text x="60" y="100" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
+        fill="white" text-anchor="middle">UBHARA</text>
+</svg>

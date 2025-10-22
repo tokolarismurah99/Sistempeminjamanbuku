@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* SmartLib Ubhara - Dark Mode Color Scheme */
+    /* Primary: Emerald Green #10b981 */
+    /* Secondary: Warm Orange #f97316 */
+    
+    --background: 222 47% 11%;              /* #0f172a - slate-900 */
+    --foreground: 0 0% 98%;                 /* #fafafa */
+    
+    --card: 217 33% 17%;                    /* #1e293b - slate-800 */
+    --card-foreground: 0 0% 98%;            /* #fafafa */
+    
+    --popover: 217 33% 17%;                 /* #1e293b */
+    --popover-foreground: 210 40% 98%;      /* #f8fafc */
+    
+    --primary: 160 84% 39%;                 /* #10b981 - emerald-500 */
+    --primary-foreground: 0 0% 100%;        /* #ffffff */
+    
+    --secondary: 25 95% 53%;                /* #f97316 - orange-500 */
+    --secondary-foreground: 0 0% 100%;      /* #ffffff */
+    
+    --muted: 217 33% 17%;                   /* #1e293b - slate-800 */
+    --muted-foreground: 215 20% 65%;        /* #94a3b8 - slate-400 */
+    
+    --accent: 217 33% 17%;                  /* #1e293b - slate-800 */
+    --accent-foreground: 142 71% 45%;       /* #34d399 - emerald-400 */
+    
+    --destructive: 0 84% 60%;               /* #ef4444 - red-500 */
+    --destructive-foreground: 0 0% 100%;    /* #ffffff */
+    
+    --border: 215 28% 27%;                  /* #334155 - slate-700 */
+    --input: 217 33% 17%;                   /* #1e293b - slate-800 */
+    --ring: 160 84% 39%;                    /* #10b981 - emerald-500 */
+    
+    --radius: 0.5rem;
+    
+    /* Sidebar */
+    --sidebar-background: 217 33% 17%;      /* #1e293b */
+    --sidebar-foreground: 0 0% 98%;         /* #fafafa */
+    --sidebar-primary: 160 84% 39%;         /* #10b981 */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 28% 27%;          /* #334155 */
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 215 28% 27%;          /* #334155 */
+    --sidebar-ring: 160 84% 39%;            /* #10b981 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+}
